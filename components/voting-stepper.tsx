@@ -31,6 +31,7 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
     if (selectedCandidateId) {
       const candidate = candidates.find((c) => c.id === selectedCandidateId)
       if (candidate) {
+        // Save the vote for current position
         setVotes((prev) => ({
           ...prev,
           [currentPosition]: {
@@ -40,6 +41,7 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
         }))
         setSelectedCandidateId(null)
 
+        // Move to next position if not the last one
         if (currentPositionIndex < positions.length - 1) {
           setCurrentPositionIndex(currentPositionIndex + 1)
         }
@@ -56,17 +58,44 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
   }
 
   const handleSubmit = async () => {
-    if (Object.keys(votes).length === positions.length) {
-      setSubmitting(true)
-      setError("")
-      try {
-        await submitVotes(votes)
-        await onVoteComplete()
-      } catch (err: any) {
-        setError(err.message || "Failed to submit votes. Please try again.")
-      } finally {
-        setSubmitting(false)
+    // First, save the current selection if there is one
+    let finalVotes = { ...votes }
+    
+    if (selectedCandidateId) {
+      const candidate = candidates.find((c) => c.id === selectedCandidateId)
+      if (candidate) {
+        finalVotes = {
+          ...finalVotes,
+          [currentPosition]: {
+            candidateId: selectedCandidateId,
+            candidateName: candidate.name,
+          },
+        }
       }
+    }
+    
+    console.log('Submit clicked. Final votes:', finalVotes)
+    console.log('Positions length:', positions.length)
+    console.log('Votes count:', Object.keys(finalVotes).length)
+    
+    if (Object.keys(finalVotes).length !== positions.length) {
+      setError(`Please vote for all ${positions.length} positions. You have voted for ${Object.keys(finalVotes).length}.`)
+      return
+    }
+    
+    setSubmitting(true)
+    setError("")
+    try {
+      console.log('Submitting votes to Firebase...')
+      await submitVotes(finalVotes)
+      console.log('Votes submitted successfully')
+      await onVoteComplete()
+      console.log('Vote complete callback executed')
+    } catch (err: any) {
+      console.error('Error submitting votes:', err)
+      setError(err.message || "Failed to submit votes. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -79,16 +108,38 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
               <Check className="w-8 h-8 sm:w-10 sm:h-10 text-green-500" />
             </div>
           </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Thank You for Voting!</h2>
+          <div className="space-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Thank You for Voting!</h2>
             <p className="text-sm sm:text-base text-muted-foreground px-4">Your votes have been recorded successfully. You cannot vote again.</p>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 sm:px-8 py-2 sm:py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity text-sm sm:text-base"
-          >
-            View Results
-          </button>
+
+        </div>
+      </div>
+    )
+  }
+
+  // Show message if no positions or candidates
+  if (positions.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px] sm:min-h-[500px] px-4">
+        <div className="text-center space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">No Voting Positions Available</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            The admin hasn't set up any voting positions yet. Please check back later.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (positionCandidates.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px] sm:min-h-[500px] px-4">
+        <div className="text-center space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">No Candidates Available</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            There are no candidates for {currentPosition}. Please contact the admin.
+          </p>
         </div>
       </div>
     )
