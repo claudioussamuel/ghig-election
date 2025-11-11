@@ -58,6 +58,7 @@ export interface UserProfile {
   gender: string;
   date_of_birth: string;
   Membership: string;
+  role?: string; // 'admin' or 'user'
 }
 
 // POSITIONS CRUD
@@ -306,6 +307,24 @@ export const getUserById = async (userId: string): Promise<UserProfile | null> =
   } catch (error: any) {
     console.error('Error getting user by ID:', error);
     throw new Error(error.message || 'Failed to get user');
+  }
+};
+
+// Get user role by user_id
+export const getUserRole = async (userId: string): Promise<string> => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('user_id', '==', userId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userData = querySnapshot.docs[0].data() as UserProfile;
+      return userData.role || 'user'; // Default to 'user' if role is not set
+    }
+    return 'user'; // Default role
+  } catch (error: any) {
+    console.error('Error getting user role:', error);
+    return 'user'; // Default to user on error
   }
 };
 

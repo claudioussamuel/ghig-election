@@ -4,11 +4,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import { onAuthStateChange, signIn, signUp, logOut } from '../firebase/auth';
 import { hasUserVoted } from '../firebase/voting-service';
+import { getUserRole } from '../firebase/admin-service';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   hasVoted: boolean;
+  userRole: string;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   logOut: () => Promise<void>;
@@ -29,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasVoted, setHasVoted] = useState(false);
+  const [userRole, setUserRole] = useState<string>('user');
 
   const checkVoteStatus = async () => {
     if (user) {
@@ -43,8 +47,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         const voted = await hasUserVoted(user.uid);
         setHasVoted(voted);
+        const role = await getUserRole(user.uid);
+        setUserRole(role);
       } else {
         setHasVoted(false);
+        setUserRole('user');
       }
       setLoading(false);
     });
@@ -63,12 +70,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleLogOut = async () => {
     await logOut();
     setHasVoted(false);
+    setUserRole('user');
   };
 
   const value = {
     user,
     loading,
     hasVoted,
+    userRole,
+    isAdmin: userRole === 'admin',
     signIn: handleSignIn,
     signUp: handleSignUp,
     logOut: handleLogOut,

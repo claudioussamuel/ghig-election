@@ -21,7 +21,7 @@ import {
 
 export default function AdminPage() {
   const router = useRouter()
-  const { user, loading, logOut } = useAuth()
+  const { user, loading, isAdmin, logOut } = useAuth()
   const [positions, setPositions] = useState<Position[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [showPositionForm, setShowPositionForm] = useState(false)
@@ -47,12 +47,15 @@ export default function AdminPage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/auth")
+    } else if (!loading && user && !isAdmin) {
+      // Redirect non-admin users to home page
+      router.push("/")
     }
-  }, [user, loading, router])
+  }, [user, loading, isAdmin, router])
 
   // Subscribe to positions and candidates
   useEffect(() => {
-    if (!user) return
+    if (!user || !isAdmin) return
 
     const unsubscribePositions = subscribeToPositions((positions) => {
       setPositions(positions)
@@ -208,6 +211,18 @@ export default function AdminPage() {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </main>
+    )
+  }
+
+  // Show loading while checking admin status
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verifying access...</p>
         </div>
       </main>
     )

@@ -57,6 +57,7 @@ export interface UserProfile {
   Council_Approved: string;
   Zonal_sector: string;
   created_at: any;
+  role?: string; // 'admin' or 'user'
 }
 
 // Portfolio with User Data (for display)
