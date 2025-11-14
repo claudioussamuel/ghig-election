@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, Edit2, LogOut, ArrowLeft } from "lucide-react"
+import { Plus, Trash2, Edit2, LogOut, ArrowLeft, AlertTriangle, History, RefreshCw } from "lucide-react"
 import { useAuth } from "@/lib/context/AuthContext"
 import {
   Position,
   Candidate,
   UserProfile,
+  AuditLog,
   subscribeToPositions,
   subscribeToCandidates,
   createPosition,
@@ -17,6 +18,11 @@ import {
   updateCandidate,
   deleteCandidate,
   searchUsersByName,
+  deleteUserVote,
+  resetAllVotes,
+  subscribeToVoteRecords,
+  subscribeToAuditLogs,
+  getTotalVoteCount,
 } from "@/lib/firebase/admin-service"
 
 export default function AdminPage() {
@@ -43,6 +49,15 @@ export default function AdminPage() {
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([])
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [searchingUsers, setSearchingUsers] = useState(false)
+  
+  // Vote management state
+  const [voteRecords, setVoteRecords] = useState<any[]>([])
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [totalVotes, setTotalVotes] = useState(0)
+  const [showVoteManagement, setShowVoteManagement] = useState(false)
+  const [showAuditLogs, setShowAuditLogs] = useState(false)
+  const [confirmResetDialog, setConfirmResetDialog] = useState(false)
+  const [deletingVoteId, setDeletingVoteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -70,11 +85,70 @@ export default function AdminPage() {
       unsubscribePositions()
       unsubscribeCandidates()
     }
-  }, [user])
+  }, [user, isAdmin])
+
+  // Subscribe to vote records and audit logs
+  useEffect(() => {
+    if (!user || !isAdmin) return
+
+    const unsubscribeVoteRecords = subscribeToVoteRecords((records) => {
+      setVoteRecords(records)
+      setTotalVotes(records.length)
+    })
+
+    const unsubscribeAuditLogs = subscribeToAuditLogs((logs) => {
+      setAuditLogs(logs)
+    })
+
+    // Get initial total vote count
+    getTotalVoteCount().then(count => setTotalVotes(count))
+
+    return () => {
+      unsubscribeVoteRecords()
+      unsubscribeAuditLogs()
+    }
+  }, [user, isAdmin])
 
   const handleLogout = async () => {
     await logOut()
     router.push("/auth")
+  }
+
+  // Vote management handlers
+  const handleDeleteVote = async (userId: string) => {
+    if (!user?.uid || !user?.email) return
+    
+    try {
+      setError("")
+      setDeletingVoteId(userId)
+      await deleteUserVote(userId, user.uid, user.email)
+      setDeletingVoteId(null)
+    } catch (err: any) {
+      setError(err.message || "Failed to delete vote")
+      setDeletingVoteId(null)
+    }
+  }
+
+  const handleResetAllVotes = async () => {
+    if (!user?.uid || !user?.email) return
+    
+    try {
+      setError("")
+      await resetAllVotes(user.uid, user.email)
+      setConfirmResetDialog(false)
+    } catch (err: any) {
+      setError(err.message || "Failed to reset all votes")
+    }
+  }
+
+  const formatTimestamp = (timestamp: any) => {
+    if (!timestamp) return 'N/A'
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleString()
+    } catch {
+      return 'N/A'
+    }
   }
 
   const handleAddPosition = async () => {
@@ -444,6 +518,169 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* Vote Management Section */}
+        <div className="mt-4 sm:mt-8 bg-card rounded-xl border border-border p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-foreground">Vote Management</h2>
+              <p className="text-sm text-muted-foreground mt-1">Total Votes: {totalVotes}</p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setShowVoteManagement(!showVoteManagement)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-colors text-sm sm:text-base"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {showVoteManagement ? 'Hide' : 'Manage Votes'}
+              </button>
+              <button
+                onClick={() => setShowAuditLogs(!showAuditLogs)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-purple-500/10 text-purple-500 rounded-lg hover:bg-purple-500/20 transition-colors text-sm sm:text-base"
+              >
+                <History className="w-4 h-4" />
+                {showAuditLogs ? 'Hide' : 'Audit Logs'}
+              </button>
+            </div>
+          </div>
+
+          {showVoteManagement && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-red-500 text-sm sm:text-base">Reset All Votes</p>
+                    <p className="text-xs sm:text-sm text-red-400">This will delete all vote records and reset counts to zero</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setConfirmResetDialog(true)}
+                  className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm sm:text-base flex-shrink-0"
+                >
+                  Reset All
+                </button>
+              </div>
+
+              {voteRecords.length > 0 ? (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base">Individual Vote Records</h3>
+                  {voteRecords.map((record) => (
+                    <div key={record.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3 bg-muted rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground font-medium text-sm sm:text-base truncate">{record.userEmail}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Voted: {formatTimestamp(record.timestamp)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Positions: {record.votes?.map((v: any) => v.position).join(', ')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteVote(record.userId)}
+                        disabled={deletingVoteId === record.userId}
+                        className="w-full sm:w-auto px-3 py-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {deletingVoteId === record.userId ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4" />
+                            Delete Vote
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No votes recorded yet</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showAuditLogs && (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">Audit Log History</h3>
+              {auditLogs.length > 0 ? (
+                auditLogs.map((log) => (
+                  <div key={log.id} className="p-3 bg-muted rounded-lg">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          log.action === 'reset_all_votes' 
+                            ? 'bg-red-500/20 text-red-500' 
+                            : 'bg-orange-500/20 text-orange-500'
+                        }`}>
+                          {log.action === 'reset_all_votes' ? 'RESET ALL' : 'DELETE VOTE'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{formatTimestamp(log.timestamp)}</span>
+                      </div>
+                      {log.voteCountBefore !== undefined && log.voteCountAfter !== undefined && (
+                        <span className="text-xs text-muted-foreground">
+                          Votes: {log.voteCountBefore} → {log.voteCountAfter}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-foreground mb-1">{log.details}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Performed by: {log.performedByEmail}
+                    </p>
+                    {log.targetUserEmail && (
+                      <p className="text-xs text-muted-foreground">
+                        Target user: {log.targetUserEmail}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No audit logs yet</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Confirmation Dialog for Reset All Votes */}
+        {confirmResetDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-xl border border-border p-6 max-w-md w-full">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+                <h3 className="text-lg font-bold text-foreground">Confirm Reset All Votes</h3>
+              </div>
+              <p className="text-muted-foreground mb-6">
+                Are you sure you want to reset all votes? This action will:
+              </p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground mb-6 space-y-1">
+                <li>Delete all {totalVotes} vote records</li>
+                <li>Reset all vote counts to zero</li>
+                <li>Create an audit log entry</li>
+                <li>This action cannot be undone</li>
+              </ul>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleResetAllVotes}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Yes, Reset All Votes
+                </button>
+                <button
+                  onClick={() => setConfirmResetDialog(false)}
+                  className="flex-1 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

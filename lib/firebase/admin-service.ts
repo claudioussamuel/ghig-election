@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -326,6 +327,238 @@ export const getUserRole = async (userId: string): Promise<string> => {
     console.error('Error getting user role:', error);
     return 'user'; // Default to user on error
   }
+};
+
+// AUDIT LOG INTERFACE
+export interface AuditLog {
+  id: string;
+  action: 'delete_vote' | 'reset_all_votes' | 'delete_vote_record';
+  performedBy: string;        // User ID of admin
+  performedByEmail: string;   // Email of admin
+  targetUserId?: string;      // For individual vote deletions
+  targetUserEmail?: string;   // For individual vote deletions
+  timestamp: any;
+  details: string;            // Additional context
+  voteCountBefore?: number;   // Total votes before action
+  voteCountAfter?: number;    // Total votes after action
+}
+
+// VOTE MANAGEMENT FUNCTIONS
+
+// Get total vote count
+export const getTotalVoteCount = async (): Promise<number> => {
+  try {
+    const voteRecordsRef = collection(db, 'voteRecords');
+    const querySnapshot = await getDocs(voteRecordsRef);
+    return querySnapshot.size;
+  } catch (error: any) {
+    console.error('Error getting total vote count:', error);
+    return 0;
+  }
+};
+
+// Create audit log entry
+const createAuditLog = async (
+  action: AuditLog['action'],
+  performedBy: string,
+  performedByEmail: string,
+  details: string,
+  targetUserId?: string,
+  targetUserEmail?: string,
+  voteCountBefore?: number,
+  voteCountAfter?: number
+): Promise<void> => {
+  try {
+    const auditLogsRef = collection(db, 'auditLogs');
+    const newDocRef = doc(auditLogsRef);
+    
+    const auditLog: AuditLog = {
+      id: newDocRef.id,
+      action,
+      performedBy,
+      performedByEmail,
+      targetUserId,
+      targetUserEmail,
+      timestamp: Timestamp.now(),
+      details,
+      voteCountBefore,
+      voteCountAfter,
+    };
+    
+    await setDoc(newDocRef, auditLog);
+  } catch (error: any) {
+    console.error('Error creating audit log:', error);
+    // Don't throw error - audit log failure shouldn't block the main action
+  }
+};
+
+// Delete a single user's vote
+export const deleteUserVote = async (
+  userId: string,
+  adminId: string,
+  adminEmail: string
+): Promise<void> => {
+  try {
+    const voteCountBefore = await getTotalVoteCount();
+    
+    // Get the user's vote record to log details
+    const voteRecordRef = doc(db, 'voteRecords', userId);
+    const voteRecordSnap = await getDoc(voteRecordRef);
+    
+    if (!voteRecordSnap.exists()) {
+      throw new Error('Vote record not found');
+    }
+    
+    const voteRecord = voteRecordSnap.data();
+    const userEmail = voteRecord.userEmail || 'Unknown';
+    
+    // Decrement vote counts for each position the user voted for
+    if (voteRecord.votes && Array.isArray(voteRecord.votes)) {
+      for (const vote of voteRecord.votes) {
+        const voteCountId = `${vote.position}_${vote.candidateId}`;
+        const voteCountRef = doc(db, 'voteCounts', voteCountId);
+        const voteCountSnap = await getDoc(voteCountRef);
+        
+        if (voteCountSnap.exists()) {
+          const currentCount = voteCountSnap.data().count || 0;
+          if (currentCount > 0) {
+            await updateDoc(voteCountRef, {
+              count: currentCount - 1,
+            });
+          }
+        }
+      }
+    }
+    
+    // Delete the vote record
+    await deleteDoc(voteRecordRef);
+    
+    const voteCountAfter = await getTotalVoteCount();
+    
+    // Create audit log
+    await createAuditLog(
+      'delete_vote',
+      adminId,
+      adminEmail,
+      `Deleted vote for user ${userEmail}. Positions: ${voteRecord.votes?.map((v: any) => v.position).join(', ')}`,
+      userId,
+      userEmail,
+      voteCountBefore,
+      voteCountAfter
+    );
+  } catch (error: any) {
+    console.error('Error deleting user vote:', error);
+    throw new Error(error.message || 'Failed to delete vote');
+  }
+};
+
+// Reset all votes (delete all vote records and reset vote counts)
+export const resetAllVotes = async (
+  adminId: string,
+  adminEmail: string
+): Promise<void> => {
+  try {
+    const voteCountBefore = await getTotalVoteCount();
+    
+    // Delete all vote records
+    const voteRecordsRef = collection(db, 'voteRecords');
+    const voteRecordsSnapshot = await getDocs(voteRecordsRef);
+    
+    const deletePromises = voteRecordsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    // Reset all vote counts to 0
+    const voteCountsRef = collection(db, 'voteCounts');
+    const voteCountsSnapshot = await getDocs(voteCountsRef);
+    
+    const resetPromises = voteCountsSnapshot.docs.map(doc => 
+      updateDoc(doc.ref, { count: 0 })
+    );
+    await Promise.all(resetPromises);
+    
+    const voteCountAfter = 0;
+    
+    // Create audit log
+    await createAuditLog(
+      'reset_all_votes',
+      adminId,
+      adminEmail,
+      `Reset all votes. Total votes deleted: ${voteCountBefore}`,
+      undefined,
+      undefined,
+      voteCountBefore,
+      voteCountAfter
+    );
+  } catch (error: any) {
+    console.error('Error resetting all votes:', error);
+    throw new Error(error.message || 'Failed to reset all votes');
+  }
+};
+
+// Get all audit logs (for viewing history)
+export const getAllAuditLogs = async (): Promise<AuditLog[]> => {
+  try {
+    const auditLogsRef = collection(db, 'auditLogs');
+    const q = query(auditLogsRef, orderBy('timestamp', 'desc'));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as AuditLog));
+  } catch (error: any) {
+    console.error('Error getting audit logs:', error);
+    throw new Error(error.message || 'Failed to get audit logs');
+  }
+};
+
+// Subscribe to audit logs (real-time)
+export const subscribeToAuditLogs = (
+  callback: (logs: AuditLog[]) => void
+) => {
+  const auditLogsRef = collection(db, 'auditLogs');
+  const q = query(auditLogsRef, orderBy('timestamp', 'desc'));
+  
+  return onSnapshot(q, (snapshot) => {
+    const logs = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as AuditLog));
+    callback(logs);
+  });
+};
+
+// Get all vote records (for admin viewing)
+export const getAllVoteRecords = async () => {
+  try {
+    const voteRecordsRef = collection(db, 'voteRecords');
+    const q = query(voteRecordsRef, orderBy('timestamp', 'desc'));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error: any) {
+    console.error('Error getting vote records:', error);
+    throw new Error(error.message || 'Failed to get vote records');
+  }
+};
+
+// Subscribe to vote records (real-time)
+export const subscribeToVoteRecords = (
+  callback: (records: any[]) => void
+) => {
+  const voteRecordsRef = collection(db, 'voteRecords');
+  const q = query(voteRecordsRef, orderBy('timestamp', 'desc'));
+  
+  return onSnapshot(q, (snapshot) => {
+    const records = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(records);
+  });
 };
 
 export { Timestamp };
