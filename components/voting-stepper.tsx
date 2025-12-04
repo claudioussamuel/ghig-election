@@ -8,8 +8,8 @@ import { submitVotes } from "@/lib/firebase/voting-service"
 interface VotingStepperProps {
   positions: Position[]
   candidates: Candidate[]
-  hasVoted: boolean
-  onVoteComplete: () => Promise<void>
+  hasVoted?: boolean
+  onVoteComplete?: () => Promise<void>
 }
 
 export default function VotingStepper({ positions, candidates, hasVoted, onVoteComplete }: VotingStepperProps) {
@@ -60,7 +60,7 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
   const handleSubmit = async () => {
     // First, save the current selection if there is one
     let finalVotes = { ...votes }
-    
+
     if (selectedCandidateId) {
       const candidate = candidates.find((c) => c.id === selectedCandidateId)
       if (candidate) {
@@ -73,23 +73,23 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
         }
       }
     }
-    
+
     console.log('Submit clicked. Final votes:', finalVotes)
     console.log('Positions length:', positions.length)
     console.log('Votes count:', Object.keys(finalVotes).length)
-    
+
     if (Object.keys(finalVotes).length !== positions.length) {
       setError(`Please vote for all ${positions.length} positions. You have voted for ${Object.keys(finalVotes).length}.`)
       return
     }
-    
+
     setSubmitting(true)
     setError("")
     try {
       console.log('Submitting votes to Firebase...')
       await submitVotes(finalVotes)
       console.log('Votes submitted successfully')
-      await onVoteComplete()
+      await onVoteComplete?.()
       console.log('Vote complete callback executed')
     } catch (err: any) {
       console.error('Error submitting votes:', err)
@@ -165,9 +165,8 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
         {positions.map((position, index) => (
           <div key={position.id} className="flex flex-col items-center gap-1 sm:gap-2 flex-1">
             <div
-              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold transition-all text-sm sm:text-base ${
-                index <= currentPositionIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold transition-all text-sm sm:text-base ${index <= currentPositionIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}
             >
               {index + 1}
             </div>
@@ -187,11 +186,10 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
           <div
             key={candidate.id}
             onClick={() => handleSelectCandidate(candidate.id)}
-            className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-              selectedCandidateId === candidate.id
-                ? "border-primary bg-primary/5 shadow-lg"
-                : "border-border hover:border-primary/50 hover:shadow-md"
-            }`}
+            className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${selectedCandidateId === candidate.id
+              ? "border-primary bg-primary/5 shadow-lg"
+              : "border-border hover:border-primary/50 hover:shadow-md"
+              }`}
           >
             <div className="aspect-square overflow-hidden bg-muted">
               <img
@@ -209,11 +207,10 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
                     e.stopPropagation()
                     handleSelectCandidate(candidate.id)
                   }}
-                  className={`w-full py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                    selectedCandidateId === candidate.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground hover:bg-muted/80"
-                  }`}
+                  className={`w-full py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${selectedCandidateId === candidate.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground hover:bg-muted/80"
+                    }`}
                 >
                   {selectedCandidateId === candidate.id ? "✓ Selected" : "Select"}
                 </button>

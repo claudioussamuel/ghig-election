@@ -1,5 +1,4 @@
 import { getDocument, setDocument, updateDocument, getDocuments, subscribeToCollection, Timestamp, where } from './firestore';
-import { getCurrentUser } from './auth';
 
 // Types
 export interface Vote {
@@ -45,22 +44,25 @@ export const hasUserVoted = async (userId: string): Promise<boolean> => {
 export const submitVotes = async (
   votes: Record<string, { candidateId: string; candidateName: string }>
 ): Promise<void> => {
-  const user = getCurrentUser();
-  if (!user) {
-    throw new Error('User must be authenticated to vote');
+  // Import PIN auth functions
+  const { getCurrentPin, markAsVoted } = await import('../pin-auth');
+
+  const pin = getCurrentPin();
+  if (!pin) {
+    throw new Error('You must enter a PIN to vote');
   }
 
   try {
-    // Check if user has already voted
-    const alreadyVoted = await hasUserVoted(user.uid);
+    // Check if user has already voted (using PIN as userId)
+    const alreadyVoted = await hasUserVoted(pin);
     if (alreadyVoted) {
       throw new Error('You have already voted');
     }
 
-    // Create vote record
+    // Create vote record using PIN as the identifier
     const voteRecord: VoteRecord = {
-      userId: user.uid,
-      userEmail: user.email || '',
+      userId: pin,
+      userEmail: `pin-${pin}`, // Use PIN as identifier
       votes: Object.entries(votes).map(([position, data]) => ({
         position,
         candidateId: data.candidateId,
@@ -71,12 +73,15 @@ export const submitVotes = async (
     };
 
     // Save vote record
-    await setDocument('voteRecords', user.uid, voteRecord);
+    await setDocument('voteRecords', pin, voteRecord);
 
     // Update vote counts for each position
     for (const [position, data] of Object.entries(votes)) {
       await incrementVoteCount(position, data.candidateId, data.candidateName);
     }
+
+    // Mark PIN as voted in localStorage
+    markAsVoted();
   } catch (error: any) {
     throw new Error(error.message || 'Failed to submit votes');
   }
@@ -113,16 +118,16 @@ const incrementVoteCount = async (
 export const getAllVoteCounts = async (): Promise<Record<string, Record<string, number>>> => {
   try {
     const voteCounts = await getDocuments('voteCounts');
-    
+
     const result: Record<string, Record<string, number>> = {};
-    
+
     voteCounts.forEach((voteCount: any) => {
       if (!result[voteCount.position]) {
         result[voteCount.position] = {};
       }
       result[voteCount.position][voteCount.candidateId] = voteCount.count || 0;
     });
-    
+
     return result;
   } catch (error) {
     console.error('Error getting vote counts:', error);
@@ -136,14 +141,14 @@ export const subscribeToVoteCounts = (
 ) => {
   return subscribeToCollection('voteCounts', (data) => {
     const result: Record<string, Record<string, number>> = {};
-    
+
     data.forEach((voteCount: any) => {
       if (!result[voteCount.position]) {
         result[voteCount.position] = {};
       }
       result[voteCount.position][voteCount.candidateId] = voteCount.count || 0;
     });
-    
+
     callback(result);
   });
 };
