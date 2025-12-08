@@ -49,7 +49,7 @@ export default function AdminPage() {
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([])
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [searchingUsers, setSearchingUsers] = useState(false)
-  
+
   // Vote management state
   const [voteRecords, setVoteRecords] = useState<any[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
@@ -61,10 +61,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/auth")
+      router.push("/admin/auth")
     } else if (!loading && user && !isAdmin) {
-      // Redirect non-admin users to home page
-      router.push("/")
+      // Redirect non-admin users to admin auth page with error
+      router.push("/admin/auth")
     }
   }, [user, loading, isAdmin, router])
 
@@ -117,7 +117,7 @@ export default function AdminPage() {
   // Vote management handlers
   const handleDeleteVote = async (userId: string) => {
     if (!user?.uid || !user?.email) return
-    
+
     try {
       setError("")
       setDeletingVoteId(userId)
@@ -131,7 +131,7 @@ export default function AdminPage() {
 
   const handleResetAllVotes = async () => {
     if (!user?.uid || !user?.email) return
-    
+
     try {
       setError("")
       await resetAllVotes(user.uid, user.email)
@@ -246,7 +246,7 @@ export default function AdminPage() {
   // Handle user search
   const handleNameChange = async (value: string) => {
     setFormData({ ...formData, name: value })
-    
+
     if (value.trim().length >= 2) {
       setSearchingUsers(true)
       try {
@@ -612,11 +612,10 @@ export default function AdminPage() {
                   <div key={log.id} className="p-3 bg-muted rounded-lg">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          log.action === 'reset_all_votes' 
-                            ? 'bg-red-500/20 text-red-500' 
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${log.action === 'reset_all_votes'
+                            ? 'bg-red-500/20 text-red-500'
                             : 'bg-orange-500/20 text-orange-500'
-                        }`}>
+                          }`}>
                           {log.action === 'reset_all_votes' ? 'RESET ALL' : 'DELETE VOTE'}
                         </span>
                         <span className="text-xs text-muted-foreground">{formatTimestamp(log.timestamp)}</span>

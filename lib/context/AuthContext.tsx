@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { onAuthStateChange, signIn, signUp, logOut } from '../firebase/auth';
+import { onAuthStateChange, signInWithPin, logOut, getPinFromUser } from '../firebase/auth';
 import { hasUserVoted } from '../firebase/voting-service';
 import { getUserRole } from '../firebase/admin-service';
 
@@ -12,10 +12,10 @@ interface AuthContextType {
   hasVoted: boolean;
   userRole: string;
   isAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signInWithPin: (pin: string) => Promise<void>;
   logOut: () => Promise<void>;
   checkVoteStatus: () => Promise<void>;
+  getUserPin: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,12 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const handleSignIn = async (email: string, password: string) => {
-    await signIn(email, password);
-  };
-
-  const handleSignUp = async (email: string, password: string) => {
-    await signUp(email, password);
+  const handleSignInWithPin = async (pin: string) => {
+    await signInWithPin(pin);
   };
 
   const handleLogOut = async () => {
@@ -73,17 +69,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserRole('user');
   };
 
+  const getUserPin = (): string | null => {
+    if (user) {
+      return getPinFromUser(user);
+    }
+    return null;
+  };
+
   const value = {
     user,
     loading,
     hasVoted,
     userRole,
     isAdmin: userRole === 'admin',
-    signIn: handleSignIn,
-    signUp: handleSignUp,
+    signInWithPin: handleSignInWithPin,
     logOut: handleLogOut,
     checkVoteStatus,
+    getUserPin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
