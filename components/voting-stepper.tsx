@@ -29,21 +29,36 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
 
   const handleNext = () => {
     if (selectedCandidateId) {
-      const candidate = candidates.find((c) => c.id === selectedCandidateId)
-      if (candidate) {
-        // Save the vote for current position
+      if (selectedCandidateId === "__NO_VOTE__") {
         setVotes((prev) => ({
           ...prev,
           [currentPosition]: {
-            candidateId: selectedCandidateId,
-            candidateName: candidate.name,
+            candidateId: "__NO_VOTE__",
+            candidateName: "No",
           },
         }))
         setSelectedCandidateId(null)
 
-        // Move to next position if not the last one
         if (currentPositionIndex < positions.length - 1) {
           setCurrentPositionIndex(currentPositionIndex + 1)
+        }
+      } else {
+        const candidate = candidates.find((c) => c.id === selectedCandidateId)
+        if (candidate) {
+          // Save the vote for current position
+          setVotes((prev) => ({
+            ...prev,
+            [currentPosition]: {
+              candidateId: selectedCandidateId,
+              candidateName: candidate.name,
+            },
+          }))
+          setSelectedCandidateId(null)
+
+          // Move to next position if not the last one
+          if (currentPositionIndex < positions.length - 1) {
+            setCurrentPositionIndex(currentPositionIndex + 1)
+          }
         }
       }
     }
@@ -60,29 +75,39 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
   const handleSubmit = async () => {
     // First, save the current selection if there is one
     let finalVotes = { ...votes }
-    
+
     if (selectedCandidateId) {
-      const candidate = candidates.find((c) => c.id === selectedCandidateId)
-      if (candidate) {
+      if (selectedCandidateId === "__NO_VOTE__") {
         finalVotes = {
           ...finalVotes,
           [currentPosition]: {
-            candidateId: selectedCandidateId,
-            candidateName: candidate.name,
+            candidateId: "__NO_VOTE__",
+            candidateName: "No",
           },
+        }
+      } else {
+        const candidate = candidates.find((c) => c.id === selectedCandidateId)
+        if (candidate) {
+          finalVotes = {
+            ...finalVotes,
+            [currentPosition]: {
+              candidateId: selectedCandidateId,
+              candidateName: candidate.name,
+            },
+          }
         }
       }
     }
-    
+
     console.log('Submit clicked. Final votes:', finalVotes)
     console.log('Positions length:', positions.length)
     console.log('Votes count:', Object.keys(finalVotes).length)
-    
+
     if (Object.keys(finalVotes).length !== positions.length) {
       setError(`Please vote for all ${positions.length} positions. You have voted for ${Object.keys(finalVotes).length}.`)
       return
     }
-    
+
     setSubmitting(true)
     setError("")
     try {
@@ -165,9 +190,8 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
         {positions.map((position, index) => (
           <div key={position.id} className="flex flex-col items-center gap-1 sm:gap-2 flex-1">
             <div
-              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold transition-all text-sm sm:text-base ${
-                index <= currentPositionIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold transition-all text-sm sm:text-base ${index <= currentPositionIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}
             >
               {index + 1}
             </div>
@@ -182,46 +206,109 @@ export default function VotingStepper({ positions, candidates, hasVoted, onVoteC
         <p className="text-center text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">Select your preferred candidate</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        {positionCandidates.map((candidate) => (
-          <div
-            key={candidate.id}
-            onClick={() => handleSelectCandidate(candidate.id)}
-            className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
-              selectedCandidateId === candidate.id
-                ? "border-primary bg-primary/5 shadow-lg"
-                : "border-border hover:border-primary/50 hover:shadow-md"
-            }`}
-          >
-            <div className="aspect-square overflow-hidden bg-muted">
-              <img
-                src={candidate.image || "/placeholder.svg"}
-                alt={candidate.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="p-3 sm:p-4">
-              <h3 className="font-bold text-foreground text-base sm:text-lg">{candidate.name}</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{candidate.bio}</p>
-              <div className="mt-3 sm:mt-4">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleSelectCandidate(candidate.id)
-                  }}
-                  className={`w-full py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                    selectedCandidateId === candidate.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground hover:bg-muted/80"
+      {positionCandidates.length === 1 ? (
+        <div className="max-w-md mx-auto">
+          {positionCandidates.map((candidate) => (
+            <div key={candidate.id} className="flex flex-col gap-6">
+              <div
+                className={`rounded-xl overflow-hidden border-2 transition-all ${selectedCandidateId === candidate.id
+                  ? "border-primary bg-primary/5 shadow-lg"
+                  : selectedCandidateId === "__NO_VOTE__"
+                    ? "border-red-500/50 bg-red-500/5"
+                    : "border-border"
                   }`}
+              >
+                <div className="aspect-square overflow-hidden bg-muted relative">
+                  <img
+                    src={candidate.image || "/placeholder.svg"}
+                    alt={candidate.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {selectedCandidateId === candidate.id && (
+                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                      <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2">
+                        <Check className="w-5 h-5" />
+                        Selected
+                      </div>
+                    </div>
+                  )}
+                  {selectedCandidateId === "__NO_VOTE__" && (
+                    <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
+                      <div className="bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg">
+                        Voted No
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 text-center">
+                  <h3 className="font-bold text-foreground text-xl">{candidate.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-2">{candidate.bio}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleSelectCandidate(candidate.id)}
+                  className={`py-3 px-4 rounded-xl font-bold transition-all border-2 ${selectedCandidateId === candidate.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-muted hover:border-primary/50"
+                    }`}
                 >
-                  {selectedCandidateId === candidate.id ? "✓ Selected" : "Select"}
+                  YES
+                </button>
+                <button
+                  onClick={() => handleSelectCandidate("__NO_VOTE__")}
+                  className={`py-3 px-4 rounded-xl font-bold transition-all border-2 ${selectedCandidateId === "__NO_VOTE__"
+                    ? "bg-red-500 text-white border-red-500"
+                    : "bg-background text-foreground border-muted hover:border-red-500/50 hover:text-red-500"
+                    }`}
+                >
+                  NO
                 </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {positionCandidates.map((candidate) => (
+            <div
+              key={candidate.id}
+              onClick={() => handleSelectCandidate(candidate.id)}
+              className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${selectedCandidateId === candidate.id
+                ? "border-primary bg-primary/5 shadow-lg"
+                : "border-border hover:border-primary/50 hover:shadow-md"
+                }`}
+            >
+              <div className="aspect-square overflow-hidden bg-muted">
+                <img
+                  src={candidate.image || "/placeholder.svg"}
+                  alt={candidate.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="p-3 sm:p-4">
+                <h3 className="font-bold text-foreground text-base sm:text-lg">{candidate.name}</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{candidate.bio}</p>
+                <div className="mt-3 sm:mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSelectCandidate(candidate.id)
+                    }}
+                    className={`w-full py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${selectedCandidateId === candidate.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground hover:bg-muted/80"
+                      }`}
+                  >
+                    {selectedCandidateId === candidate.id ? "✓ Selected" : "Select"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Navigation Buttons */}
       <div className="flex justify-between items-center gap-2 sm:gap-4">

@@ -60,6 +60,7 @@ export interface UserProfile {
   date_of_birth: string;
   Membership: string;
   role?: string; // 'admin' or 'user'
+  debit?: number;
 }
 
 // POSITIONS CRUD
@@ -70,7 +71,7 @@ export const getAllPositions = async (): Promise<Position[]> => {
     const positionsRef = collection(db, 'positions');
     const q = query(positionsRef, orderBy('order', 'asc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -87,7 +88,7 @@ export const subscribeToPositions = (
 ) => {
   const positionsRef = collection(db, 'positions');
   const q = query(positionsRef, orderBy('order', 'asc'));
-  
+
   return onSnapshot(q, (snapshot) => {
     const positions = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -102,7 +103,7 @@ export const createPosition = async (name: string, order: number): Promise<strin
   try {
     const positionsRef = collection(db, 'positions');
     const newDocRef = doc(positionsRef);
-    
+
     const position: Position = {
       id: newDocRef.id,
       name,
@@ -110,7 +111,7 @@ export const createPosition = async (name: string, order: number): Promise<strin
       created_at: Timestamp.now(),
       updated_at: Timestamp.now(),
     };
-    
+
     await setDoc(newDocRef, position);
     return newDocRef.id;
   } catch (error: any) {
@@ -155,7 +156,7 @@ export const getAllCandidates = async (): Promise<Candidate[]> => {
     const candidatesRef = collection(db, 'candidates');
     const q = query(candidatesRef, orderBy('created_at', 'desc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -172,7 +173,7 @@ export const subscribeToCandidates = (
 ) => {
   const candidatesRef = collection(db, 'candidates');
   const q = query(candidatesRef, orderBy('created_at', 'desc'));
-  
+
   return onSnapshot(q, (snapshot) => {
     const candidates = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -189,14 +190,14 @@ export const createCandidate = async (
   try {
     const candidatesRef = collection(db, 'candidates');
     const newDocRef = doc(candidatesRef);
-    
+
     const candidate: Candidate = {
       ...candidateData,
       id: newDocRef.id,
       created_at: Timestamp.now(),
       updated_at: Timestamp.now(),
     };
-    
+
     await setDoc(newDocRef, candidate);
     return newDocRef.id;
   } catch (error: any) {
@@ -255,21 +256,21 @@ export const searchUsersByName = async (searchTerm: string): Promise<UserProfile
 
     const usersRef = collection(db, 'users');
     const searchLower = searchTerm.toLowerCase();
-    
+
     // Get all users and filter client-side (Firestore doesn't support case-insensitive search)
     const querySnapshot = await getDocs(usersRef);
-    
+
     const users = querySnapshot.docs
       .map(doc => doc.data() as UserProfile)
       .filter(user => {
         const fullName = `${user.Firstname} ${user.Surname}`.toLowerCase();
         const reverseName = `${user.Surname} ${user.Firstname}`.toLowerCase();
-        return fullName.includes(searchLower) || 
-               reverseName.includes(searchLower) ||
-               user.Firstname.toLowerCase().includes(searchLower) ||
-               user.Surname.toLowerCase().includes(searchLower);
+        return fullName.includes(searchLower) ||
+          reverseName.includes(searchLower) ||
+          user.Firstname.toLowerCase().includes(searchLower) ||
+          user.Surname.toLowerCase().includes(searchLower);
       });
-    
+
     return users.slice(0, 10); // Limit to 10 results
   } catch (error: any) {
     console.error('Error searching users:', error);
@@ -283,7 +284,7 @@ export const getUserByEmail = async (email: string): Promise<UserProfile | null>
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', email));
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       return querySnapshot.docs[0].data() as UserProfile;
     }
@@ -300,7 +301,7 @@ export const getUserById = async (userId: string): Promise<UserProfile | null> =
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('user_id', '==', userId));
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       return querySnapshot.docs[0].data() as UserProfile;
     }
@@ -317,7 +318,7 @@ export const getUserRole = async (userId: string): Promise<string> => {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('user_id', '==', userId));
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       const userData = querySnapshot.docs[0].data() as UserProfile;
       return userData.role || 'user'; // Default to 'user' if role is not set
@@ -371,7 +372,7 @@ const createAuditLog = async (
   try {
     const auditLogsRef = collection(db, 'auditLogs');
     const newDocRef = doc(auditLogsRef);
-    
+
     const auditLog: AuditLog = {
       id: newDocRef.id,
       action,
@@ -384,7 +385,7 @@ const createAuditLog = async (
       voteCountBefore,
       voteCountAfter,
     };
-    
+
     await setDoc(newDocRef, auditLog);
   } catch (error: any) {
     console.error('Error creating audit log:', error);
@@ -400,25 +401,25 @@ export const deleteUserVote = async (
 ): Promise<void> => {
   try {
     const voteCountBefore = await getTotalVoteCount();
-    
+
     // Get the user's vote record to log details
     const voteRecordRef = doc(db, 'voteRecords', userId);
     const voteRecordSnap = await getDoc(voteRecordRef);
-    
+
     if (!voteRecordSnap.exists()) {
       throw new Error('Vote record not found');
     }
-    
+
     const voteRecord = voteRecordSnap.data();
     const userEmail = voteRecord.userEmail || 'Unknown';
-    
+
     // Decrement vote counts for each position the user voted for
     if (voteRecord.votes && Array.isArray(voteRecord.votes)) {
       for (const vote of voteRecord.votes) {
         const voteCountId = `${vote.position}_${vote.candidateId}`;
         const voteCountRef = doc(db, 'voteCounts', voteCountId);
         const voteCountSnap = await getDoc(voteCountRef);
-        
+
         if (voteCountSnap.exists()) {
           const currentCount = voteCountSnap.data().count || 0;
           if (currentCount > 0) {
@@ -429,12 +430,12 @@ export const deleteUserVote = async (
         }
       }
     }
-    
+
     // Delete the vote record
     await deleteDoc(voteRecordRef);
-    
+
     const voteCountAfter = await getTotalVoteCount();
-    
+
     // Create audit log
     await createAuditLog(
       'delete_vote',
@@ -459,25 +460,25 @@ export const resetAllVotes = async (
 ): Promise<void> => {
   try {
     const voteCountBefore = await getTotalVoteCount();
-    
+
     // Delete all vote records
     const voteRecordsRef = collection(db, 'voteRecords');
     const voteRecordsSnapshot = await getDocs(voteRecordsRef);
-    
+
     const deletePromises = voteRecordsSnapshot.docs.map(doc => deleteDoc(doc.ref));
     await Promise.all(deletePromises);
-    
+
     // Reset all vote counts to 0
     const voteCountsRef = collection(db, 'voteCounts');
     const voteCountsSnapshot = await getDocs(voteCountsRef);
-    
-    const resetPromises = voteCountsSnapshot.docs.map(doc => 
+
+    const resetPromises = voteCountsSnapshot.docs.map(doc =>
       updateDoc(doc.ref, { count: 0 })
     );
     await Promise.all(resetPromises);
-    
+
     const voteCountAfter = 0;
-    
+
     // Create audit log
     await createAuditLog(
       'reset_all_votes',
@@ -501,7 +502,7 @@ export const getAllAuditLogs = async (): Promise<AuditLog[]> => {
     const auditLogsRef = collection(db, 'auditLogs');
     const q = query(auditLogsRef, orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -518,7 +519,7 @@ export const subscribeToAuditLogs = (
 ) => {
   const auditLogsRef = collection(db, 'auditLogs');
   const q = query(auditLogsRef, orderBy('timestamp', 'desc'));
-  
+
   return onSnapshot(q, (snapshot) => {
     const logs = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -534,7 +535,7 @@ export const getAllVoteRecords = async () => {
     const voteRecordsRef = collection(db, 'voteRecords');
     const q = query(voteRecordsRef, orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -551,7 +552,7 @@ export const subscribeToVoteRecords = (
 ) => {
   const voteRecordsRef = collection(db, 'voteRecords');
   const q = query(voteRecordsRef, orderBy('timestamp', 'desc'));
-  
+
   return onSnapshot(q, (snapshot) => {
     const records = snapshot.docs.map(doc => ({
       id: doc.id,
