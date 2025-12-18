@@ -23,6 +23,7 @@ import {
   subscribeToVoteRecords,
   subscribeToAuditLogs,
   getTotalVoteCount,
+  uploadImage,
 } from "@/lib/firebase/admin-service"
 
 export default function AdminPage() {
@@ -49,6 +50,26 @@ export default function AdminPage() {
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([])
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [searchingUsers, setSearchingUsers] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError("")
+    try {
+      // Create a unique path for the image
+      const timestamp = Date.now()
+      const path = `candidates/${timestamp}_${file.name}`
+      const url = await uploadImage(file, path)
+      setFormData({ ...formData, image: url })
+    } catch (err: any) {
+      setError(err.message || "Failed to upload image")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   // Vote management state
   const [voteRecords, setVoteRecords] = useState<any[]>([])
@@ -468,13 +489,41 @@ export default function AdminPage() {
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
                   rows={2}
                 />
-                <input
-                  type="text"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  placeholder="Image URL"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Candidate Image</label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          {uploading ? (
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                          ) : formData.image ? (
+                            <img src={formData.image} alt="Preview" className="h-20 object-contain" />
+                          ) : (
+                            <>
+                              <Plus className="w-8 h-8 text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground">Click to upload image</p>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="Or enter Image URL manually"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={editingCandidate ? handleUpdateCandidate : handleAddCandidate}
@@ -613,8 +662,8 @@ export default function AdminPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${log.action === 'reset_all_votes'
-                            ? 'bg-red-500/20 text-red-500'
-                            : 'bg-orange-500/20 text-orange-500'
+                          ? 'bg-red-500/20 text-red-500'
+                          : 'bg-orange-500/20 text-orange-500'
                           }`}>
                           {log.action === 'reset_all_votes' ? 'RESET ALL' : 'DELETE VOTE'}
                         </span>

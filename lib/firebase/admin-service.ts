@@ -12,7 +12,20 @@ import {
   Timestamp,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from './config';
+import { db, storage } from './config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+// Upload image to Firebase Storage
+export const uploadImage = async (file: File, path: string): Promise<string> => {
+  try {
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file);
+    return await getDownloadURL(snapshot.ref);
+  } catch (error: any) {
+    console.error('Error uploading image:', error);
+    throw new Error(error.message || 'Failed to upload image');
+  }
+};
 
 // Position Interface
 export interface Position {
