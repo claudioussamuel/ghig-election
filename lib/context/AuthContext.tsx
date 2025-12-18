@@ -12,7 +12,7 @@ interface AuthContextType {
   hasVoted: boolean;
   userRole: string;
   isAdmin: boolean;
-  signInWithPin: (pin: string) => Promise<void>;
+  signInWithPin: (pin: string, email?: string) => Promise<void>;
   logOut: () => Promise<void>;
   checkVoteStatus: () => Promise<void>;
   getUserPin: () => string | null;
@@ -59,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const handleSignInWithPin = async (pin: string) => {
-    await signInWithPin(pin);
+  const handleSignInWithPin = async (pin: string, email?: string) => {
+    await signInWithPin(pin, email);
   };
 
   const handleLogOut = async () => {

@@ -6,6 +6,8 @@ import { Lock, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/context/AuthContext"
 import PinInput from "@/components/pin-input"
 import { getUserByEmail } from "@/lib/firebase/admin-service"
+import { generatePinFromEmail } from "@/lib/firebase/auth"
+
 
 function AuthContent() {
   const router = useRouter()
@@ -38,7 +40,7 @@ function AuthContent() {
           if (user.Membership === "SMGhIG") {
             setIsRestricted(true)
             setRestrictionReason("student")
-          } else if (user.debit !== undefined && user.debit < 0) {
+          } else if (user.debit !== undefined && user.debit < -10) {
             setIsRestricted(true)
             setRestrictionReason("debt")
           }
@@ -53,23 +55,14 @@ function AuthContent() {
     checkUser()
   }, [email])
 
-  const generateCode = (emailStr: string) => {
-    let hash = 5381
-    for (let i = 0; i < emailStr.length; i++) {
-      hash = ((hash << 5) + hash) + emailStr.charCodeAt(i)
-    }
-    // Ensure positive and 6 digits: 100000-999999
-    return (Math.abs(hash) % 900000 + 100000).toString()
-  }
-
-  const accessCode = email ? generateCode(email) : null
+  const accessCode = email ? generatePinFromEmail(email) : null
 
   const handlePinComplete = async (completedPin: string) => {
     setError("")
     setLoading(true)
 
     try {
-      await signInWithPin(completedPin)
+      await signInWithPin(completedPin, email || undefined)
       router.push("/")
     } catch (err: any) {
       setError(err.message || "Authentication failed. Please try again.")
@@ -187,7 +180,8 @@ export default function AuthPage() {
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       }>
-        <AuthContent />
+        {/* <AuthContent /> */}
+        We will let you in when it is time for election
       </Suspense>
     </main>
   )
