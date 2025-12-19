@@ -8,6 +8,16 @@ import {
 } from 'firebase/auth';
 import { auth } from './config';
 
+// PIN generation logic (moved from app/auth/page.tsx)
+export const generatePinFromEmail = (emailStr: string): string => {
+  let hash = 5381
+  for (let i = 0; i < emailStr.length; i++) {
+    hash = ((hash << 5) + hash) + emailStr.charCodeAt(i)
+  }
+  // Ensure positive and 6 digits: 100000-999999
+  return (Math.abs(hash) % 900000 + 100000).toString()
+}
+
 // Convert PIN to email format for Firebase (legacy fallback)
 const pinToEmail = (pin: string): string => {
   return `pin-${pin}@vote.app`;
@@ -84,6 +94,9 @@ export const getCurrentUser = (): User | null => {
 export const getPinFromUser = (user: User): string | null => {
   if (user.email?.startsWith('pin-') && user.email.endsWith('@vote.app')) {
     return user.email.replace('pin-', '').replace('@vote.app', '');
+  }
+  if (user.email) {
+    return generatePinFromEmail(user.email);
   }
   return null;
 };
