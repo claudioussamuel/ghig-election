@@ -35,14 +35,27 @@ function AuthContent() {
         if (user) {
           // Check for restrictions
           // Logic from Flutter:
-          // isRestricted = (membership == "SMGhIG" || (debit != null && debit < 0))
+          // final hasFunding = user?.fundingInstitution != null &&
+          //     user?.fundingInstitution != "Self" &&
+          //     user!.fundingInstitution!.isNotEmpty;
 
-          if (user.Membership === "SMGhIG") {
-            setIsRestricted(true)
-            setRestrictionReason("student")
-          } else if (user.debit !== undefined && user.debit < -10) {
-            setIsRestricted(true)
-            setRestrictionReason("debt")
+          // final isRestricted = user != null &&
+          //     !hasFunding &&
+          //     (user.membership == "SMGhIG" ||
+          //         (user.debit != null && user.debit! < -10));
+
+          const hasFunding = user.Funding_Institution &&
+            user.Funding_Institution !== "Self" &&
+            user.Funding_Institution.trim().length > 0;
+
+          if (!hasFunding) {
+            if (user.Membership === "SMGhIG") {
+              setIsRestricted(true)
+              setRestrictionReason("student")
+            } else if (user.debit !== undefined && user.debit < -10) {
+              setIsRestricted(true)
+              setRestrictionReason("debt")
+            }
           }
         }
       } catch (err) {

@@ -74,6 +74,7 @@ export interface UserProfile {
   Membership: string;
   role?: string; // 'admin' or 'user'
   debit?: number;
+  Funding_Institution?: string;
 }
 
 // POSITIONS CRUD

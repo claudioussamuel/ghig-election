@@ -93,7 +93,7 @@ export default function Home() {
               >
                 Vote
               </button>
-              <button
+              {/* <button
                 onClick={() => setCurrentView("dashboard")}
                 className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${currentView === "dashboard"
                   ? "bg-primary text-primary-foreground"
@@ -101,7 +101,7 @@ export default function Home() {
                   }`}
               >
                 Results
-              </button>
+              </button> */}
             </div>
             <button
               onClick={() => router.push("/admin/auth")}
