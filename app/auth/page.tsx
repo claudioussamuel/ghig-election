@@ -193,8 +193,8 @@ export default function AuthPage() {
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       }>
-        {/* <AuthContent /> */}
-        We will let you in when it is time for election
+        <AuthContent />
+        {/* We will let you in when it is time for election */}
       </Suspense>
     </main>
   )
