@@ -8,16 +8,6 @@ import {
 } from 'firebase/auth';
 import { auth } from './config';
 
-// PIN generation logic (moved from app/auth/page.tsx)
-export const generatePinFromEmail = (emailStr: string): string => {
-  let hash = 5381
-  for (let i = 0; i < emailStr.length; i++) {
-    hash = ((hash << 5) + hash) + emailStr.charCodeAt(i)
-  }
-  // Ensure positive and 6 digits: 100000-999999
-  return (Math.abs(hash) % 900000 + 100000).toString()
-}
-
 // Convert PIN to email format for Firebase (legacy fallback)
 const pinToEmail = (pin: string): string => {
   return `pin-${pin}@vote.app`;
@@ -27,9 +17,9 @@ const pinToEmail = (pin: string): string => {
 const PIN_PASSWORD = 'vote-pin-2024';
 
 // Sign up with PIN
-export const signUpWithPin = async (pin: string, actualEmail?: string): Promise<UserCredential> => {
+export const signUpWithPin = async (pin: string): Promise<UserCredential> => {
   try {
-    const email = actualEmail || pinToEmail(pin);
+    const email = pinToEmail(pin);
     const userCredential = await createUserWithEmailAndPassword(auth, email, PIN_PASSWORD);
     return userCredential;
   } catch (error: any) {
@@ -38,15 +28,15 @@ export const signUpWithPin = async (pin: string, actualEmail?: string): Promise<
 };
 
 // Sign in with PIN
-export const signInWithPin = async (pin: string, actualEmail?: string): Promise<UserCredential> => {
+export const signInWithPin = async (pin: string): Promise<UserCredential> => {
   try {
-    const email = actualEmail || pinToEmail(pin);
+    const email = pinToEmail(pin);
     const userCredential = await signInWithEmailAndPassword(auth, email, PIN_PASSWORD);
     return userCredential;
   } catch (error: any) {
     // If user doesn't exist, create account automatically
     if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
-      return await signUpWithPin(pin, actualEmail);
+      return await signUpWithPin(pin);
     }
     throw new Error(error.message || 'Failed to sign in');
   }
@@ -94,9 +84,6 @@ export const getCurrentUser = (): User | null => {
 export const getPinFromUser = (user: User): string | null => {
   if (user.email?.startsWith('pin-') && user.email.endsWith('@vote.app')) {
     return user.email.replace('pin-', '').replace('@vote.app', '');
-  }
-  if (user.email) {
-    return generatePinFromEmail(user.email);
   }
   return null;
 };

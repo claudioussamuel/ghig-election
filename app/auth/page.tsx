@@ -6,7 +6,6 @@ import { Lock, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/context/AuthContext"
 import PinInput from "@/components/pin-input"
 import { getUserByEmail } from "@/lib/firebase/admin-service"
-import { generatePinFromEmail } from "@/lib/firebase/auth"
 
 
 function AuthContent() {
@@ -68,14 +67,14 @@ function AuthContent() {
     checkUser()
   }, [email])
 
-  const accessCode = email ? generatePinFromEmail(email) : null
+
 
   const handlePinComplete = async (completedPin: string) => {
     setError("")
     setLoading(true)
 
     try {
-      await signInWithPin(completedPin, email || undefined)
+      await signInWithPin(completedPin)
       router.push("/")
     } catch (err: any) {
       setError(err.message || "Authentication failed. Please try again.")
@@ -148,11 +147,7 @@ function AuthContent() {
 
         <div className="bg-muted/50 rounded-lg p-4 mb-6 text-center border border-border/50">
           <p className="text-xs text-muted-foreground mb-1">Authenticated as</p>
-          <p className="text-sm font-medium text-foreground mb-3">{email}</p>
-          <div className="border-t border-border/50 my-2"></div>
-          <p className="text-xs text-muted-foreground mb-1">Your Access Code</p>
-          <p className="text-2xl font-mono font-bold text-primary tracking-wider">{accessCode}</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Enter this code below to vote</p>
+          <p className="text-sm font-medium text-foreground">{email}</p>
         </div>
 
         <div className="space-y-4 sm:space-y-6">
